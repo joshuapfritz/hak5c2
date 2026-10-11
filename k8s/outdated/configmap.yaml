@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c2-config
+data:
+  listenip: "0.0.0.0"
+  listenport: "8080"
+  sshport: "2022"
+  reverseProxy: "1"        # present → toggles flag
+  # fqdn: "c2.example.com" # optionally set
+  # publicHostname: "c2.example.com"
+  # C2_EXTRA: "-v"

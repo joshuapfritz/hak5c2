@@ -2,8 +2,10 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: c2-data
+  namespace: devsec
 spec:
-  accessModes: ["ReadWriteOnce"]
+  accessModes: [ReadWriteOnce]
+  # storageClassName: your-storage-class
   resources:
     requests:
       storage: 5Gi

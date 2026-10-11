@@ -1,0 +1,55 @@
+# Optional: Traefik must expose web, websecure, and a dedicated ssh entrypoint.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: c2-redirect-https
+  namespace: devsec
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: c2-web
+  namespace: devsec
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`c2.example.com`)
+      kind: Rule
+      middlewares:
+        - name: c2-redirect-https
+      services:
+        - name: cloudc2
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: c2-websecure
+  namespace: devsec
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`c2.example.com`)
+      kind: Rule
+      services:
+        - name: cloudc2
+          port: 80
+  tls:
+    secretName: c2-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: c2-ssh
+  namespace: devsec
+spec:
+  entryPoints: [ssh]
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: cloudc2
+          port: 2022

@@ -2,21 +2,39 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudc2
+  namespace: devsec
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
-    matchLabels: { app: cloudc2 }
+    matchLabels:
+      app: cloudc2
   template:
     metadata:
-      labels: { app: cloudc2 }
+      labels:
+        app: cloudc2
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        fsGroup: 10001
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: c2
-          image: joshuapfritz/hak5c2:latest
-          imagePullPolicy: IfNotPresent
+          # Publish the tested build to this tag before applying.
+          image: joshuapfritz/hak5c2:3.5.2
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            # C2/Overseer moves its executable during startup.
+            readOnlyRootFilesystem: false
           ports:
             - name: http
               containerPort: 8080
@@ -27,37 +45,18 @@ spec:
                 name: c2-config
             - secretRef:
                 name: c2-secrets
-          env:
-            # POD_ vars used by run.sh hostname precedence
-            - name: POD_NAME
-              valueFrom: { fieldRef: { fieldPath: metadata.name } }
-            - name: POD_IP
-              valueFrom: { fieldRef: { fieldPath: status.podIP } }
-            # If you mount TLS secret, also set:
-            # - name: certFile
-            #   value: /tls/tls.crt
-            # - name: keyFile
-            #   value: /tls/tls.key
+                optional: true
           volumeMounts:
             - name: data
               mountPath: /data
-              # readOnly: false
-            # - name: tls
-            #   mountPath: /tls
-            #   readOnly: true
-          livenessProbe:
-            httpGet:
-              path: /
+          startupProbe:
+            tcpSocket:
               port: http
-              scheme: HTTP
-            initialDelaySeconds: 45
-            periodSeconds: 30
+            periodSeconds: 5
+            failureThreshold: 60
           readinessProbe:
-            httpGet:
-              path: /
+            tcpSocket:
               port: http
-              scheme: HTTP
-            initialDelaySeconds: 20
             periodSeconds: 10
           resources:
             requests:
@@ -69,6 +68,3 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: c2-data
-        # - name: tls
-        #   secret:
-        #     secretName: c2-tls

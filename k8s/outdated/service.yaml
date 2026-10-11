@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudc2
+  namespace: devsec
+spec:
+  selector:
+    app: cloudc2
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: ssh
+      port: 2022
+      targetPort: 2022

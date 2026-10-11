@@ -2,11 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: c2-config
+  namespace: devsec
 data:
+  hostname: "c2.example.com"
+  db: "/data/c2.db"
   listenip: "0.0.0.0"
   listenport: "8080"
   sshport: "2022"
-  reverseProxy: "1"        # present → toggles flag
-  # fqdn: "c2.example.com" # optionally set
-  # publicHostname: "c2.example.com"
-  # C2_EXTRA: "-v"
+  reverseProxy: "true"
+  reverseProxyPort: "443"
+  https: "false"
+  nobanner: "true"
+  v: "true"

@@ -1,19 +1,30 @@
 services:
   cloudc2:
-    image: joshuapfritz/hak5c2:latest
+    image: joshuapfritz/hak5c2:3.5.2
+    platform: linux/amd64
     restart: unless-stopped
+    user: "65532:65532"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # C2/Overseer requires a writable application directory.
+    read_only: false
     ports:
       - "8080:8080"
       - "2022:2022"
     volumes:
-      - c2-data:/data
+      - ./data:/data
     environment:
-      # set what you need:
-      fqdn: "c2.example.com"
-      # setLicenseKey: "XXXXX-XXXXX"
+      hostname: "${C2_HOSTNAME:?Set C2_HOSTNAME to a reachable server IP or DNS name}"
+      db: "/data/c2.db"
       listenip: "0.0.0.0"
       listenport: "8080"
       sshport: "2022"
-      # reverseProxy: "1"   # only if fronted by NGINX/Traefik on the host
-volumes:
-  c2-data:
+      https: "false"
+      reverseProxy: "false"
+      nobanner: "true"
+      v: "true"
+    # Optional temporary recovery values (see README Secrets section):
+    # env_file:
+    #   - ./secrets.env

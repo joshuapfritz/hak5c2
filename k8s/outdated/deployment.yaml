@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudc2
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: cloudc2 }
+  template:
+    metadata:
+      labels: { app: cloudc2 }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 10001
+      containers:
+        - name: c2
+          image: joshuapfritz/hak5c2:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: ssh
+              containerPort: 2022
+          envFrom:
+            - configMapRef:
+                name: c2-config
+            - secretRef:
+                name: c2-secrets
+          env:
+            # POD_ vars used by run.sh hostname precedence
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            # If you mount TLS secret, also set:
+            # - name: certFile
+            #   value: /tls/tls.crt
+            # - name: keyFile
+            #   value: /tls/tls.key
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              # readOnly: false
+            # - name: tls
+            #   mountPath: /tls
+            #   readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: c2-data
+        # - name: tls
+        #   secret:
+        #     secretName: c2-tls

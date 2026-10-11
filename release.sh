@@ -1,50 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ===== config =====
-IMAGE="joshuapfritz/hak5c2"
-ARCH_SUFFIX="amd64"        # used in the tag :<version>-amd64
-TARGET="amd64_linux"       # passed to Dockerfile as --build-arg TARGET
-# ===================
-
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <version> [release-suffix]"
-  echo "Example: $0 3.5.2 stable   # => RELEASE=3.5.2-stable"
-  exit 1
+# Publish the existing tested amd64 image; do not rebuild it here.
+IMAGE="${IMAGE:-joshuapfritz/hak5c2}"
+if (( $# < 1 || $# > 2 )); then
+  echo "Usage: $0 <version> [tested-image]" >&2
+  echo "Example: $0 3.5.2 hak5c2:test" >&2
+  exit 2
 fi
+VERSION="$1"
+SOURCE_IMAGE="${2:-hak5c2:test}"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Version must have the form 3.5.2" >&2
+  exit 2
+fi
+command -v docker >/dev/null
+command -v trivy >/dev/null
+SOURCE_ID="$(docker image inspect --format '{{.Id}}' "$SOURCE_IMAGE")"
+PLATFORM="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$SOURCE_ID")"
+if [[ "$PLATFORM" != "linux/amd64" ]]; then
+  echo "This release script supports linux/amd64 only; source is $PLATFORM" >&2
+  exit 2
+fi
+REPORT_DIR="${REPORT_DIR:-reports/$VERSION}"
+mkdir -p "$REPORT_DIR"
+printf 'Image: %s\nSource: %s\nImage ID: %s\nPlatform: %s\nUTC scan time: %s\n' \
+  "$IMAGE" "$SOURCE_IMAGE" "$SOURCE_ID" "$PLATFORM" "$(date -u +%FT%TZ)" \
+  | tee "$REPORT_DIR/image.txt"
+trivy --version > "$REPORT_DIR/trivy-version.txt"
+# Findings are recorded without suppression; scanner failures stop the release.
+trivy image --scanners vuln --exit-code 0 "$SOURCE_ID" 2>&1 \
+  | tee "$REPORT_DIR/trivy.txt"
+trivy image --scanners vuln --exit-code 0 --format json \
+  --output "$REPORT_DIR/trivy.json" "$SOURCE_ID"
 
-VERSION="$1"                   # e.g. 3.5.2
-RELEASE_SUFFIX="${2:-stable}"  # default: 'stable'
-RELEASE="${VERSION}-${RELEASE_SUFFIX}"
-
-TAG_ARCH="${IMAGE}:${VERSION}-${ARCH_SUFFIX}"
-TAG_VERSION="${IMAGE}:${VERSION}"
-TAG_LATEST="${IMAGE}:latest"
-
-echo "==============================="
-echo "Image:        ${IMAGE}"
-echo "Version:      ${VERSION}"
-echo "Release ID:   ${RELEASE}"
-echo "Target:       ${TARGET}"
-echo "Tags:         ${TAG_ARCH}, ${TAG_VERSION}, ${TAG_LATEST}"
-echo "==============================="
-
-echo "[1/4] docker login (if needed)..."
-docker login
-
-echo "[2/4] Building ${TAG_ARCH}..."
-DOCKER_BUILDKIT=1 docker build \
-  --build-arg RELEASE="${RELEASE}" \
-  --build-arg TARGET="${TARGET}" \
-  -t "${TAG_ARCH}" .
-
-echo "[3/4] Tagging..."
-docker tag "${TAG_ARCH}" "${TAG_VERSION}"
-docker tag "${TAG_ARCH}" "${TAG_LATEST}"
-
-echo "[4/4] Pushing..."
-docker push "${TAG_ARCH}"
-docker push "${TAG_VERSION}"
-docker push "${TAG_LATEST}"
-
-echo "Done."
+# Use the captured image ID so retagging the source cannot change this release.
+for tag in "$VERSION-amd64" "$VERSION" latest; do
+  docker tag "$SOURCE_ID" "$IMAGE:$tag"
+done
+# Authenticate separately with docker login before invoking this script.
+for tag in "$VERSION-amd64" "$VERSION" latest; do
+  docker push "$IMAGE:$tag" 2>&1 | tee "$REPORT_DIR/push-$tag.txt"
+done
+docker image inspect --format '{{json .RepoDigests}}' "$SOURCE_ID" \
+  > "$REPORT_DIR/repo-digests.json"
+echo "Published $IMAGE:$VERSION-amd64, $IMAGE:$VERSION, and $IMAGE:latest"

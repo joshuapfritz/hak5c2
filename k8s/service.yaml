@@ -4,12 +4,13 @@ metadata:
   name: cloudc2
   namespace: devsec
 spec:
+  type: ClusterIP
   selector:
     app: cloudc2
   ports:
     - name: http
       port: 80
-      targetPort: 8080
+      targetPort: http
     - name: ssh
       port: 2022
-      targetPort: 2022
+      targetPort: ssh
