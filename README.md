@@ -1,4 +1,5 @@
-# Hak5 Cloud C2 container
+# Hak5 Cloud C2 in a container
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-joshuapfritz%2Fhack5c2-blue?logo=docker)](https://hub.docker.com/r/joshuapfritz/hack5c2)
 
 A nonroot distroless container with a Go entrypoint exposing every Cloud C2 3.5.2 command-line flag through environment variables. It supports Docker, Compose, and Kubernetes. The official Hak5 archive is downloaded at build time; C2 binaries are not stored in this repository. Hak5 licensing and EULA still apply.
 
